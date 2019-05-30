@@ -1,0 +1,102 @@
+This is a simple how to for cgroups
+cgroups allow resources to be controlled
+
+cgroups has been in the kernel for some time
+and originally created by Google
+Is currently used along with namespaces to
+implement containers.
+
+
+By default the /Sys/fs/cgroup/ shoulds be mounted already
+entries can be created manually but would recommend 
+using the helpers
+
+dnf install libcgroup libcgroup-tools
+
+
+
+For persistent entries use the service
+systemctl restart  cgconfig
+
+The configuration file for this is located at:
+/etc/cgconfig.conf
+
+
+Helpers
+
+cgcreate #creates a cgroup
+example cgcreate -g memory:bds
+
+Will create a group at 
+/sys/fs/cgroup/memory/bds
+
+cgclassify #allows one or more running process to be put in a group
+example cgclassify -g memory:bds 1234 5678
+
+All this does is put the pids in the tasks file under the controller
+cgexec # starts a process in a cgroup
+example cgexec -g memory:bds ~/test.sh
+
+cgdelete #removes a cgroup
+example cgdelete memory:bds
+
+
+cgget #reads a property from a cgroup
+cgset #reads and write a property in a cgroup
+
+
+cgsnapshot #gets a snapshot that is compatible with cgconfig
+can extract bits of the file to create or add to  a config file
+
+
+
+What cgroup is a process in
+cat /proc/self/cgroup
+
+List the sub systems
+lssubsys 
+
+
+
+Example config file for persistent entries
+
+group bds {
+        perm {
+                admin {
+                        uid = test;
+                        gid = test;
+                }
+                task {
+                        uid = test;
+                        gid = test;
+                }
+        }
+        memory {
+                memory.limit_in_bytes="104857600";
+                memory.memsw.limit_in_bytes="104857600";
+        }
+}
+
+
+Note the tasks file in the controller will be owned by task (test:test)
+the other entries will be owned by admin (test:test)
+
+
+
+Example running a bad application
+
+cgexec --sticky -g memory:bds bdsImportGui
+
+When opening a bad datafile this application would take down the system
+writing to swap. But when run in the group the kernel will terminate the application
+with Killed reported
+
+
+Kernel log (dmesg)
+[ 6151.746444] Memory cgroup out of memory: Kill process 3596 (bdsImportGui) score 1164 or sacrifice child
+[ 6151.746452] Killed process 3596 (bdsImportGui) total-vm:720712kB, anon-rss:97312kB, file-rss:17976kB, shmem-rss:3548kB
+[ 6151.751214] oom_reaper: reaped process 3596 (bdsImportGui), now anon-rss:0kB, file-rss:0kB, shmem-rss:3548kB
+
+
+
+
