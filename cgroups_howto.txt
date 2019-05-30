@@ -59,7 +59,8 @@ lssubsys
 
 
 Example config file for persistent entries
-
+#note the kernel will check that the swap is the same size or larger than memory
+#if less will report readonly file system
 group bds {
         perm {
                 admin {
