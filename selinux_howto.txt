@@ -1,0 +1,183 @@
+Note on SE linux
+created by the NSA set of patches for the Linux kernel using Linux Secuity Modules(LSM)
+
+
+url_ref:http://people.redhat.com/tcameron/Summit2018/selinux/SELinux_for_Mere_Mortals_Summit_2018.pdf
+
+
+
+DAC vs MAC
+Linux uses DAC (discretionary access control) chmod +rwx
+MAC(mandatory access control) -policy administratively set and fixed
+
+works along side +rwx so if a process has +rwx then MAC may still prevent it.
+policies can be set on all sorts of objects
+
+two policy types 
+targeted - the default policy (only targeted processes are protected) everything else undefined
+mls - multi-level/multi-category security (complex normally used in goverment orgs)
+
+
+determine the mode in operation
+cat /etc/selinux/config 
+or /usr/sbin/sestatus
+or /usr/sbin/getenforce
+
+can also change it with setenforce
+
+how it works
+Labeling
+Type Enforcment
+
+Labeling objects are labeled with an SELinux context (files, processes ,ports ...)
+for files stored as extended attributes on the file system
+for processes .. kernel manags these labels
+Label format is user:role:type:level(optional) note user, role and level used in mls/mcs
+basic SE only uses the type
+
+type
+example apache web server
+ls -lZ /usr/sbin/httpd 
+-rwxr-xr-x. 1 root root system_u:object_r:httpd_exec_t:s0 591232 Apr 17 09:56 /usr/sbin/httpd
+
+the type for the binary is httpd_exec_t
+
+
+list types of the config directory
+ ls -lZ  /etc/httpd
+
+drwxr-xr-x. 2 root root system_u:object_r:httpd_config_t:s0  4096 Apr 17 09:56 conf
+drwxr-xr-x. 2 root root system_u:object_r:httpd_config_t:s0  4096 May 21 14:54 conf.d
+drwxr-xr-x. 2 root root system_u:object_r:httpd_config_t:s0  4096 May 21 14:57 conf.modules.d
+lrwxrwxrwx. 1 root root system_u:object_r:httpd_log_t:s0       19 Apr 17 09:56 logs -> ../../var/log/httpd
+lrwxrwxrwx. 1 root root system_u:object_r:httpd_modules_t:s0   29 Apr 17 09:56 modules -> ../../usr/lib64/httpd/modules
+lrwxrwxrwx. 1 root root system_u:object_r:httpd_config_t:s0    10 Apr 17 09:56 run -> /run/httpd
+lrwxrwxrwx. 1 root root system_u:object_r:httpd_config_t:s0    19 Apr 17 09:56 state -> ../../var/lib/httpd
+
+we have httpd_config_t httpd_log_t httpd_modules_t
+
+the web servers content directory is ls -lZ /var/www/ 
+drwxr-xr-x. 2 root root system_u:object_r:httpd_sys_script_exec_t:s0 4096 Apr 17 09:56 cgi-bin
+drwxr-xr-x. 2 root root system_u:object_r:httpd_sys_content_t:s0     4096 Jun  3 10:29 html
+
+we have httpd_sys_script_exec_t and httpd_sys_content_t
+
+the service is ls -lZ /usr/lib/systemd/system/httpd.service
+-rw-r--r--. 1 root root system_u:object_r:httpd_unit_file_t:s0 944 Apr 17 09:53 /usr/lib/systemd/system/httpd.service
+
+we have httpd_unit_file_t
+
+the process is running as ps axZ | grep [h]ttpd
+system_u:system_r:httpd_t:s0     8981 ?        Ss     0:00 /usr/sbin/httpd -DFOREGROUND
+system_u:system_r:httpd_t:s0     8982 ?        S      0:00 /usr/sbin/httpd -DFOREGROUND
+system_u:system_r:httpd_t:s0     8984 ?        Sl     0:00 /usr/sbin/httpd -DFOREGROUND
+system_u:system_r:httpd_t:s0     8985 ?        Sl     0:00 /usr/sbin/httpd -DFOREGROUND
+system_u:system_r:httpd_t:s0     8989 ?        Sl     0:00 /usr/sbin/httpd -DFOREGROUND
+system_u:system_r:httpd_t:s0     9221 ?        Sl     0:00 /usr/sbin/httpd -DFOREGROUND
+
+we have httpd_t
+
+the ports also have labels
+sudo netstat -tnlpZ | grep [h]ttpd_t
+tcp6       0      0 :::80                   :::*                    LISTEN      8981/httpd           system_u:system_r:httpd_t:s0 
+
+we have httpd_t
+
+using the semanage to look at ports
+sudo semanage port -l | grep [h]ttp
+
+http_cache_port_t              tcp      8080, 8118, 8123, 10001-10010
+http_cache_port_t              udp      3130
+http_port_t                    tcp      80, 81, 443, 488, 8008, 8009, 8443, 9000
+pegasus_http_port_t            tcp      5988
+pegasus_https_port_t           tcp      5989
+
+we have http_cache_port_t, http_port_t, pegasus_http_port_t
+
+the shadow password file also has a type
+ls -lZ /etc/shadow
+----------. 1 root root system_u:object_r:shadow_t:s0 1261 May 21 15:33 /etc/shadow
+
+we have shadow_t
+
+TYPE ENFORCEMENT
+it makes sense for a process http_t to interact with a file httpd_config_t but not a file of shadow_t
+dealing with labels
+many linux command have the -Z option
+ls, id, ps, netstat ... you can use cp -Z and mkdir -Z to create and modify file contexts
+
+selinux tools chcon and restorecon to change the context of a file
+file context is usually set based on the parent when a file is created
+the login process set the default context (unconfined in the target policy)
+
+
+semanage
+can manage se settings for
+login
+user
+port
+interface
+module
+node
+file
+boolean
+permissive state
+dontaudit
+
+booleans are just on/off values
+to see a list use
+getsebool -a
+
+
+tips and tricks
+install setroubleshoot and settroubleshoot-server on machine you are developing policies on
+reboot or restart auditd after the install
+dnf install setroubleshoot
+
+
+
+
+allow user home directory access public_html on apache
+journalctl -b -l gives
+SELinux is preventing httpd from read access on the directory public_html. For complete SELinux messages run: s>
+
+setsebool httpd_enable_homedirs 1 -P
+setsebool -P httpd_read_user_content 1
+
+see what booleans have been set
+semanage boolean -l
+getsebool -a
+
+
+
+apache get a index.html file to work when mv from  user home into www
+-rw-rw-r--. 1 fred fred unconfined_u:object_r:user_home_t:s0           16 Jun  3 12:44 index.html
+
+chcon -t httpd_sys_content_t index.html
+
+-rw-rw-r--. 1 fred fred unconfined_u:object_r:httpd_sys_content_t:s0   16 Jun  3 12:44 index.html
+
+then works ok
+
+can also copy the type from an existing file chcon --reference /var/www/html/ test.html
+
+if you want to change a whole directory
+restorecon  -vR /var/www/html
+
+the restore option uses entries in the /etc/selinux/targeted/contexts/files/file_contexts
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
