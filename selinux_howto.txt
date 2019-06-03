@@ -167,7 +167,35 @@ restorecon  -vR /var/www/html
 the restore option uses entries in the /etc/selinux/targeted/contexts/files/file_contexts
 
 
+changing the security model to permissive (just log failures)
+setenforce Permissive
+setenforce Enforcing
 
+
+
+
+creating your own modules
+you can change modes to permissive run the stuff and then get audit2allow to generate the file
+cat /var/log/audit/audit.log|audit2allow -m test > test.te 
+
+
+or limit the log output to a specific type httpd_t for example
+grep  httpd_t /var/log/audit/audit.log|audit2allow -m test > test.te
+
+
+
+listing modules
+semodule -lfull
+
+module compilation
+checkmodule -M -m -o test.mod  test.te
+
+package the module (pp packaged module)
+semodule_package -o test.pp -m test.mod
+
+
+install the module
+semodule -i test.pp
 
 
 
