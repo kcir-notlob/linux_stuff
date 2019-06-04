@@ -4,7 +4,7 @@ created by the NSA set of patches for the Linux kernel using Linux Secuity Modul
 
 url_ref:http://people.redhat.com/tcameron/Summit2018/selinux/SELinux_for_Mere_Mortals_Summit_2018.pdf
 
-
+Note decisions are cached (avc) access vector cache
 
 DAC vs MAC
 Linux uses DAC (discretionary access control) chmod +rwx
@@ -198,7 +198,13 @@ install the module
 semodule -i test.pp
 
 
+enabling selinux
+file permissions (setting from nothing)
+fixfiles relabel
 
+
+selinux user interface
+system-config-selinux
 
 
 
